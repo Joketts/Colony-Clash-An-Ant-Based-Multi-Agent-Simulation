@@ -50,19 +50,9 @@ class ScoutAnt(AntBase):
         self.state = "searching"  # States: searching, returning
         self.target_food = None
         self.visited_food = set()  # Track visited food to avoid revisiting
-
-    def find_closest_food(self):
-        """Find the closest food source using Euclidean distance."""
-        closest_food = None
-        min_distance = float('inf')
-        for y, row in enumerate(self.environment.grid):
-            for x, cell in enumerate(row):
-                if cell["food"] > 0:
-                    distance = self.euclidean_distance(self.x, self.y, x, y)
-                    if distance < min_distance:
-                        closest_food = (x, y)
-                        min_distance = distance
-        return closest_food
+        self.timeout_counter = 0  # Counter to track time spent away from the nest
+        self.timeout_limit = 600  # Maximum steps before forced return to the nest
+        self.forced_return = False
 
     def find_closest_unvisited_food(self):
         """Find the closest food source that has not been visited."""
@@ -79,10 +69,20 @@ class ScoutAnt(AntBase):
         return closest_food
 
     def act(self, occupied_squares):
-        if self.steps_since_last_move < 3:  # Adjust movement speed
+        # Increment timeout counter
+        self.timeout_counter += 1
+
+        if self.steps_since_last_move < 2:  # Adjust movement speed
             self.steps_since_last_move += 1
             return
         self.steps_since_last_move = 0
+
+        # Check for timeout
+        if self.timeout_counter > self.timeout_limit:
+            # Force return to the nest
+            self.state = "returning"
+            self.target_food = None
+            self.forced_return = True  # Mark as a forced return
 
         if self.state == "searching":
             if not self.target_food:
@@ -94,6 +94,8 @@ class ScoutAnt(AntBase):
                     # Mark the food as visited and switch to returning state
                     self.visited_food.add(self.target_food)
                     self.state = "returning"
+                    self.timeout_counter = 0  # Reset timeout upon finding food
+                    self.forced_return = False  # Not a forced return
                 else:
                     # Add slight randomness to movement to diversify paths
                     if random.random() < 0.2:  # 20% chance to move randomly
@@ -105,13 +107,17 @@ class ScoutAnt(AntBase):
                 self.move_randomly(occupied_squares)
 
         elif self.state == "returning":
-            # Deposit pheromones while returning to the nest
-            self.environment.add_pheromone(self.x, self.y, amount=10, food_location=self.target_food)
+            # Deposit pheromones while returning to the nest only if not a forced return
+            if not self.forced_return:
+                self.environment.add_pheromone(self.x, self.y, amount=10, food_location=self.target_food)
+
             nest_x, nest_y = self.environment.nest
             if (self.x, self.y) == (nest_x, nest_y):
                 # Reset to searching state after returning to the nest
                 self.state = "searching"
                 self.target_food = None
+                self.timeout_counter = 0  # Reset timeout upon returning to the nest
+                self.forced_return = False  # Reset forced return flag
             else:
                 # Add slight randomness to avoid overlap
                 if random.random() < 0.1:  # 10% chance to deviate from path
@@ -123,12 +129,26 @@ class WorkerAnt(AntBase):
         super().__init__(x, y, environment)
         self.carrying_food = False
         self.last_position = None  # Track the last position to avoid loops
+        self.timeout_counter = 0  # Counter to track time spent away from the nest
+        self.timeout_limit = 300  # Maximum steps before returning to the nest
 
     def act(self, occupied_squares):
-        if self.steps_since_last_move < 3:
+        # Increment timeout counter
+        self.timeout_counter += 1
+
+        if self.steps_since_last_move < 5:
             self.steps_since_last_move += 1
             return
         self.steps_since_last_move = 0
+
+        # Timeout check: force return to the nest
+        if self.timeout_counter > self.timeout_limit:
+            nest_x, nest_y = self.environment.nest
+            if (self.x, self.y) != (nest_x, nest_y):
+                self.move_towards(nest_x, nest_y, occupied_squares)
+                return
+            else:
+                self.timeout_counter = 0  # Reset counter upon returning to the nest
 
         if self.carrying_food:
             # Return to the nest
@@ -136,6 +156,9 @@ class WorkerAnt(AntBase):
             if (self.x, self.y) == (nest_x, nest_y):
                 # Drop food at the nest
                 self.carrying_food = False
+                self.environment.food_returned += 1
+                print(f"[WorkerAnt] Food returned to nest. Total: {self.environment.food_returned}")
+                self.timeout_counter = 0  # Reset counter upon successful return
             else:
                 self.move_towards(nest_x, nest_y, occupied_squares)
         else:
@@ -167,6 +190,7 @@ class WorkerAnt(AntBase):
                 if self.environment.is_food(self.x, self.y):
                     self.carrying_food = True
                     self.environment.collect_food(self.x, self.y)
+                    self.timeout_counter = 0  # Reset counter upon finding food
             else:
                 # Random movement if no pheromones detected
                 self.move_randomly(occupied_squares)

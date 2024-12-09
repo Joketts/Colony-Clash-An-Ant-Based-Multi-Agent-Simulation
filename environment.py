@@ -10,6 +10,7 @@ class Environment:
         ]
         self.nest = (width // 2, height // 2)
         self.pheromone_trails = {}
+        self.food_returned = 0  # Counter for returned food
 
     def spawn_food(self, num_food=15):
         """Spawn food randomly across the grid."""
@@ -28,24 +29,6 @@ class Environment:
                     if random.random() < regen_rate:  # Small chance to regenerate food
                         self.grid[y][x]["food"] = random.randint(1, 5)
 
-    def is_nest(self, x, y):
-        return (x, y) == self.nest
-
-    def is_food(self, x, y):
-        return self.grid[y][x]["food"] > 0
-
-    def get_durability(self, x, y):
-        """Get the current durability of food at a location."""
-        return self.grid[y][x]["durability"]
-
-    def add_hazards(self, num_hazards=300):
-        """Add random hazard zones to the grid."""
-        import random
-        for _ in range(num_hazards):
-            x = random.randint(0, self.width - 1)
-            y = random.randint(0, self.height - 1)
-            self.grid[y][x]["hazard"] = True
-
     def collect_food(self, x, y):
         """Reduce the durability of food and remove it if exhausted."""
         if self.is_food(x, y):
@@ -61,6 +44,17 @@ class Environment:
                         self.grid[trail_y][trail_x]["pheromone"] = 0
                     del self.pheromone_trails[food_location]
                     print(f"Pheromone trail cleared for food at ({x}, {y})")
+
+    def is_food(self, x, y):
+        return self.grid[y][x]["food"] > 0
+
+    def add_hazards(self, num_hazards=300):
+        """Add random hazard zones to the grid."""
+        import random
+        for _ in range(num_hazards):
+            x = random.randint(0, self.width - 1)
+            y = random.randint(0, self.height - 1)
+            self.grid[y][x]["hazard"] = True
 
     def add_pheromone(self, x, y, amount=1, food_location=None):
         """Add pheromones and track the trail."""

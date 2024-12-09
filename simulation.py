@@ -62,5 +62,7 @@ class Simulation:
                                (agent.x * cell_size + cell_size // 2, agent.y * cell_size + cell_size // 2),
                                cell_size // 3)
 
-
+        font = pygame.font.Font(None, 36)
+        text = font.render(f"Food Returned: {self.environment.food_returned}", True, (255, 255, 255))
+        screen.blit(text, (10, 10))
 
