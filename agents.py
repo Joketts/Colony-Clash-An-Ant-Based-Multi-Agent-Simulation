@@ -3,6 +3,7 @@ import math
 
 import heapq
 
+
 def a_star_search(environment, start, goal):
     """A* algorithm to find the shortest path avoiding hazards."""
     def heuristic(a, b):
@@ -40,12 +41,16 @@ def a_star_search(environment, start, goal):
         current = came_from.get(current, start)
     path.reverse()
     return path
+
+
 class AntBase:
+
     def __init__(self, x, y, environment):
         self.x = x
         self.y = y
         self.environment = environment
         self.steps_since_last_move = 0
+        self.alive = True  # Add alive attribute
 
     def move_randomly(self, occupied_squares):
         """Move randomly, avoiding occupied and hazard squares."""
@@ -107,7 +112,7 @@ class ScoutAnt(AntBase):
                     self.hazards.append((x, y))
         print(f"[ScoutAnt] Scanned environment. Resources: {len(self.resources)}, Hazards: {len(self.hazards)}")
 
-    def act(self, occupied_squares):
+    def act(self, occupied_squares, all_ants):
         if self.steps_since_last_move < 3:  # Adjust movement speed
             self.steps_since_last_move += 1
             return
@@ -165,7 +170,7 @@ class WorkerAnt(AntBase):
         self.recent_positions = []  # Keep track of last few visited positions
         self.memory_limit = 5  # Number of positions to remember
 
-    def act(self, occupied_squares):
+    def act(self, occupied_squares, all_ants):
         # Increment timeout counter
         self.timeout_counter += 1
 
@@ -214,13 +219,17 @@ class WorkerAnt(AntBase):
                 # Follow colony-specific pheromones
             ]
 
+            if not any(isinstance(ant, ScoutAnt) and ant.alive for ant in all_ants if ant.colony == self.colony):
+                # No scout ants alive in the colony
+                self.move_randomly(occupied_squares)
+
             if valid_moves:
                 best_move = max(valid_moves, key=lambda pos: (
                     self.environment.grid[pos[1]][pos[0]]["pheromone"].get(self.colony, 0),
                     -self.euclidean_distance(pos[0], pos[1], self.environment.nests[self.colony][0],
                                              self.environment.nests[self.colony][1])
                 ))
-                print(f"[WorkerAnt] Colony {self.colony} following pheromone at {best_move} with strength {self.environment.grid[best_move[1]][best_move[0]]['pheromone'].get(self.colony, 0)}")
+                #print(f"[WorkerAnt] Colony {self.colony} following pheromone at {best_move} with strength {self.environment.grid[best_move[1]][best_move[0]]['pheromone'].get(self.colony, 0)}")
                 self.last_position = (self.x, self.y)
                 self.x, self.y = best_move
 
@@ -238,3 +247,85 @@ class WorkerAnt(AntBase):
                 # Fallback: Explore randomly if no valid pheromone trails are detected
                 self.move_randomly(occupied_squares)
                 self.last_position = (self.x, self.y)
+
+class AttackAnt(AntBase):
+    def __init__(self, x, y, environment, colony):
+        super().__init__(x, y, environment)
+        self.colony = colony
+        self.attack_radius = 2  # Range to check for enemies
+        self.follow_distance = 5  # Maintain a minimum distance from the scout
+        self.in_final_duel = False  # Flag for final showdown behavior
+
+    def act(self, occupied_squares, all_ants):
+        if self.steps_since_last_move < 3:
+            self.steps_since_last_move += 1
+            return
+        self.steps_since_last_move = 0
+
+        # Detect if this colony has only attackers left
+        self.check_only_attackers_left(all_ants)
+
+        if self.only_attackers_left:
+            # Aggressive mode: seek and attack nearest enemy ant
+            enemy_ant = self.find_nearest_enemy_attacker(all_ants)
+            if enemy_ant:
+                self.move_towards(enemy_ant.x, enemy_ant.y, occupied_squares)
+                if self.euclidean_distance(self.x, self.y, enemy_ant.x, enemy_ant.y) <= self.attack_radius:
+                    self.attack([enemy_ant])
+            else:
+                self.move_randomly(occupied_squares)
+        else:
+            # Regular mode: protect scouts or patrol
+            enemy_ants = self.detect_enemies(all_ants)
+            if enemy_ants:
+                self.attack(enemy_ants)
+            else:
+                scout_position = self.find_scout_position(all_ants)
+                if scout_position:
+                    distance = self.euclidean_distance(self.x, self.y, scout_position[0], scout_position[1])
+                    if distance > self.follow_distance:
+                        self.move_towards(scout_position[0], scout_position[1], occupied_squares)
+                    else:
+                        self.move_randomly(occupied_squares)
+                else:
+                    self.move_randomly(occupied_squares)
+
+    def check_only_attackers_left(self, all_ants):
+        """Check if this colony only has AttackAnts left."""
+        colony_ants = [ant for ant in all_ants if ant.colony == self.colony]
+        self.only_attackers_left = all(isinstance(ant, AttackAnt) for ant in colony_ants)
+
+    def find_nearest_enemy_attacker(self, all_ants):
+        """Find the nearest enemy AttackAnt."""
+        nearest_enemy = None
+        min_distance = float('inf')
+        for ant in all_ants:
+            if isinstance(ant, AttackAnt) and ant.colony != self.colony:
+                distance = self.euclidean_distance(self.x, self.y, ant.x, ant.y)
+                if distance < min_distance:
+                    nearest_enemy = ant
+                    min_distance = distance
+        return nearest_enemy
+
+    def detect_enemies(self, all_ants):
+        """Detect enemy ants within attack radius."""
+        enemies = []
+        for ant in all_ants:
+            if ant.colony != self.colony:  # Check if it's an enemy
+                distance = self.euclidean_distance(self.x, self.y, ant.x, ant.y)
+                if distance <= self.attack_radius:
+                    enemies.append(ant)
+        return enemies
+
+    def find_scout_position(self, all_ants):
+        """Find the position of the nearest scout ant in the same colony."""
+        for ant in all_ants:
+            if isinstance(ant, ScoutAnt) and ant.colony == self.colony:
+                return ant.x, ant.y
+        return None
+
+    def attack(self, enemies):
+        """Attack the first enemy found."""
+        target = enemies[0]  # Choose the first enemy (could add prioritization)
+        print(f"[AttackAnt] Colony {self.colony} attacks enemy ant at ({target.x}, {target.y})!")
+        target.alive = False  # Mark the enemy ant as removed
