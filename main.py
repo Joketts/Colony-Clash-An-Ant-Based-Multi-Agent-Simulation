@@ -1,10 +1,12 @@
 import pygame
 from simulation import Simulation
 
+
 def main():
     pygame.init()
+    # sets display size
     screen = pygame.display.set_mode((1250, 1250))
-    pygame.display.set_caption("Virtual Ant Farm")
+    pygame.display.set_caption("Ant Colony Sim")
     clock = pygame.time.Clock()
 
     simulation = Simulation()

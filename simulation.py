@@ -8,97 +8,104 @@ class Simulation:
         self.environment = Environment(75, 75)
         self.food_counters = {1: 0, 2: 0}
 
+        # nest for colony 1
         nest_1_x, nest_1_y = self.environment.nests[1]
+        # starting agents for colony 1
         self.agents = [
             ScoutAnt(nest_1_x, nest_1_y, self.environment, colony=1),
             WorkerAnt(nest_1_x, nest_1_y, self.environment, colony=1),
             WorkerAnt(nest_1_x, nest_1_y + 2, self.environment, colony=1),
             WorkerAnt(nest_1_x - 2, nest_1_y, self.environment, colony=1),
-            AttackAnt(nest_1_x, nest_1_y - 4, self.environment, colony=1),  # Add AttackAnt for Colony 1
+            AttackAnt(nest_1_x, nest_1_y - 4, self.environment, colony=1),
         ]
 
-        # Create agents for Colony 2
+        # nest for colony 2
         nest_2_x, nest_2_y = self.environment.nests[2]
+        # starting agents for colony 2
         self.agents.extend([
             ScoutAnt(nest_2_x, nest_2_y, self.environment, colony=2),
             WorkerAnt(nest_2_x, nest_2_y, self.environment, colony=2),
             WorkerAnt(nest_2_x, nest_2_y + 2, self.environment, colony=2),
             WorkerAnt(nest_2_x - 2, nest_2_y, self.environment, colony=2),
-            AttackAnt(nest_2_x, nest_2_y - 4, self.environment, colony=2),  # Add AttackAnt for Colony 2
+            AttackAnt(nest_2_x, nest_2_y - 4, self.environment, colony=2),
         ])
 
-        self.all_ants = self.agents.copy()  # Initialize self.all_ants
+        # get copy of ants
+        self.all_ants = self.agents.copy()
+
         self.environment.spawn_food()
         self.environment.add_hazards(num_hazards=500)
-        self.occupied_squares = set()  # Track occupied squares
+        self.occupied_squares = set()
 
     def update(self):
-        self.occupied_squares.clear()
 
-        # Mark occupied squares
+        # clears and updates occupied squares
+        self.occupied_squares.clear()
         for agent in self.agents:
             self.occupied_squares.add((agent.x, agent.y))
 
-        # Remove dead ants
+        # removes dead ants
         self.all_ants = [ant for ant in self.all_ants if ant.alive]
         self.agents = [ant for ant in self.agents if ant.alive]
 
+        # handles ant respawning and ant role changes
         for colony in [1, 2]:
+            # check if colony has enough food for new ant
             if self.environment.food_returned[colony] >= 6:
                 self.environment.food_returned[colony] -= 6
                 self.food_counters[colony] += 1
 
-                # Spawn a new ant
+                # spawn either new worker or attack ant
                 nest_x, nest_y = self.environment.nests[colony]
-                if self.food_counters[colony] % 2 == 0:  # Alternate between WorkerAnt and AttackAnt
+                if self.food_counters[colony] % 2 == 0:
                     new_ant = WorkerAnt(nest_x, nest_y, self.environment, colony)
-                    print(f"[Colony {colony}] Spawned a new WorkerAnt at the nest.")
+                    print(f"[colony {colony}] spawned new worker ant")
                 else:
                     new_ant = AttackAnt(nest_x, nest_y, self.environment, colony)
-                    print(f"[Colony {colony}] Spawned a new AttackAnt at the nest.")
+                    print(f"[colony {colony}] spawned new attack ant")
 
+                # add new ants
                 self.all_ants.append(new_ant)
                 self.agents.append(new_ant)
 
-            # Check if there are no ScoutAnts and promote a WorkerAnt if needed
+            # check if no scouts alive, change worker ant to scout
             if not any(isinstance(ant, ScoutAnt) and ant.colony == colony for ant in self.all_ants):
                 for index, ant in enumerate(self.all_ants):
                     if isinstance(ant, WorkerAnt) and ant.colony == colony:
-                        print(f"[Colony {colony}] Promoting WorkerAnt at ({ant.x}, {ant.y}) to ScoutAnt.")
+                        print(f"[colony {colony}] changing worker ant ({ant.x}, {ant.y}) to scout ant")
                         new_scout = ScoutAnt(ant.x, ant.y, self.environment, colony)
                         self.all_ants[index] = new_scout
 
-                        # Update in self.agents
+                        # update the ant list
                         for i, agent in enumerate(self.agents):
                             if agent is ant:
                                 self.agents[i] = new_scout
                                 break
                         break
 
-            # Check if there are no AttackAnts and promote a WorkerAnt if needed
+            # check if there are no attack ants and change a worker ant to attack
             if not any(isinstance(ant, AttackAnt) and ant.colony == colony for ant in self.all_ants):
                 for index, ant in enumerate(self.all_ants):
                     if isinstance(ant, WorkerAnt) and ant.colony == colony:
-                        print(f"[Colony {colony}] Promoting WorkerAnt at ({ant.x}, {ant.y}) to AttackAnt.")
+                        print(f"[colony {colony}] changing worker ({ant.x}, {ant.y}) to attack")
                         new_attacker = AttackAnt(ant.x, ant.y, self.environment, colony)
                         self.all_ants[index] = new_attacker
 
-                        # Update in self.agents
                         for i, agent in enumerate(self.agents):
                             if agent is ant:
                                 self.agents[i] = new_attacker
                                 break
                         break
+
             # check if last scout is the last alive change to attacker
             colony_ants = [ant for ant in self.all_ants if ant.colony == colony]
             if len(colony_ants) == 1 and isinstance(colony_ants[0], ScoutAnt):
                 scout = colony_ants[0]
-                print(f"[Colony {colony}] Last ScoutAnt at ({scout.x}, {scout.y}) becoming AttackAnt.")
+                print(f"[colony {colony}] last scout alive ({scout.x}, {scout.y}) change to attacker")
                 new_attacker = AttackAnt(scout.x, scout.y, self.environment, colony)
                 self.all_ants.remove(scout)
                 self.all_ants.append(new_attacker)
 
-                # Update in self.agents
                 for i, agent in enumerate(self.agents):
                     if agent is scout:
                         self.agents[i] = new_attacker
@@ -111,31 +118,27 @@ class Simulation:
             if len(colony_ants) == 2 and len(scouts) == 1 and len(attackers) == 1:
                 scout = scouts[0]
                 print(
-                    f"[Colony {colony}] Only ScoutAnt and AttackAnt remain. Promoting ScoutAnt at ({scout.x}, {scout.y}) to AttackAnt.")
-
-                # Replace the ScoutAnt with an AttackAnt
+                    f"[colony {colony}] only scout and attacker remain changing ({scout.x}, {scout.y}) to attack ant")
                 new_attacker = AttackAnt(scout.x, scout.y, self.environment, colony)
                 self.all_ants.remove(scout)
                 self.all_ants.append(new_attacker)
 
-                # Update in self.agents
                 for i, agent in enumerate(self.agents):
                     if agent is scout:
                         self.agents[i] = new_attacker
                         break
 
-            # Count the number of each type of ant
+            # gets number of each type of ant
             colony_ants = [ant for ant in self.all_ants if ant.colony == colony]
             scout_ants = [ant for ant in colony_ants if isinstance(ant, ScoutAnt)]
             worker_ants = [ant for ant in colony_ants if isinstance(ant, WorkerAnt)]
             attack_ants = [ant for ant in colony_ants if isinstance(ant, AttackAnt)]
 
-            # Check if the colony is unbalanced: 1 ScoutAnt and 2 AttackAnts but no WorkerAnts
+            # checks for 1 scout and two attacker ants and 0 worker ants
             if len(scout_ants) == 1 and len(attack_ants) >= 2 and len(worker_ants) == 0:
-                # Convert one of the AttackAnts into a WorkerAnt
-                attack_ant_to_convert = attack_ants[0]  # Select the first AttackAnt
+                attack_ant_to_convert = attack_ants[0]
                 print(
-                    f"[Colony {colony}] Converting AttackAnt at ({attack_ant_to_convert.x}, {attack_ant_to_convert.y}) to WorkerAnt.")
+                    f"[ colony {colony}] changing attacker ant: ({attack_ant_to_convert.x}, {attack_ant_to_convert.y}) to worker ant ")
                 new_worker = WorkerAnt(attack_ant_to_convert.x, attack_ant_to_convert.y, self.environment, colony)
 
                 # Replace the AttackAnt with the new WorkerAnt
@@ -148,20 +151,22 @@ class Simulation:
                         self.agents[i] = new_worker
                         break
 
-        # Update all ants
+        # update all ants
         for agent in self.all_ants:
             agent.act(self.occupied_squares, self.all_ants)
 
-        # Clear pheromones where food has been depleted
-        self.environment.update_pheromone_lifetime()
+        # clear pheromone trails
+        self.environment.update_pheromone_timeleft()
+        # regen food
         self.environment.regenerate_food()
-
+        # count ants
         self.count_ants()
-        # Check for victory
-        if self.check_victory():
+        # check for game end
+        if self.game_end():
             return  # Stop simulation if a colony has won
 
-    def check_victory(self):
+    # checks for game end
+    def game_end(self):
         colony_counts = {1: 0, 2: 0}
         for ant in self.all_ants:
             colony_counts[ant.colony] += 1
@@ -174,8 +179,8 @@ class Simulation:
             return True
         return False
 
+    # count ants for display
     def count_ants(self):
-        """Count ants by type for each colony."""
         colony_counts = {1: {"scouts": 0, "workers": 0, "attackers": 0},
                          2: {"scouts": 0, "workers": 0, "attackers": 0}}
         for ant in self.all_ants:
@@ -188,19 +193,23 @@ class Simulation:
         return colony_counts
 
     def render(self, screen):
-        screen.fill((10, 100, 25))   # Background color
+        # background colour
+        screen.fill((10, 100, 25))
         cell_size = 16
 
+        # render each cell of environment grid
         for y, row in enumerate(self.environment.grid):
             for x, cell in enumerate(row):
+                # hazard with dark brown color
                 if cell["hazard"]:
                     pygame.draw.rect(screen, (102, 51, 0),
-                                     (x * cell_size, y * cell_size, cell_size, cell_size))  # Dark red
+                                     (x * cell_size, y * cell_size, cell_size, cell_size))
+                # food with yellow color
                 elif cell["food"] > 0:
                     pygame.draw.rect(screen, (255, 255, 102),
-                                     (x * cell_size, y * cell_size, cell_size, cell_size))  # Green for food
+                                     (x * cell_size, y * cell_size, cell_size, cell_size))
                 else:
-                    # Check pheromone levels explicitly
+                    # check pheromone levels for brightness intensity
                     has_pheromone = False
                     if isinstance(cell["pheromone"], dict):
                         for colony, value in cell["pheromone"].items():
@@ -208,36 +217,42 @@ class Simulation:
                                 has_pheromone = True
                                 break
                     else:
-                        cell["pheromone"] = {1: 0, 2: 0}  # Reset to avoid rendering issues
+                        cell["pheromone"] = {1: 0, 2: 0}
                     if has_pheromone:
-                        brightness_blue = min(255, int(cell["pheromone"].get(1, 0) * 2))  # Colony 1: Blue
-                        brightness_green = min(255, int(cell["pheromone"].get(2, 0) * 2))  # Colony 2: red
-                        color = (brightness_green, 55, brightness_blue)
+                        # blue and red for respective colonys
+                        brightness_blue = min(255, int(cell["pheromone"].get(1, 0) * 2))
+                        brightness_red = min(255, int(cell["pheromone"].get(2, 0) * 2))
+                        color = (brightness_red, 55, brightness_blue)
                         pygame.draw.rect(screen, color, (x * cell_size, y * cell_size, cell_size, cell_size))
 
-        # Draw the nest
+        # renders nests
         for colony, (nest_x, nest_y) in self.environment.nests.items():
             color = (0, 102, 255) if colony == 1 else (255, 51, 51)  # Different colors for each nest
             pygame.draw.rect(screen, color, (nest_x * cell_size, nest_y * cell_size, cell_size, cell_size))
 
-        # Draw ants
+        # renders ants
         for agent in self.agents:
             if isinstance(agent, ScoutAnt):
-                color = (0, 255, 255)  # Cyan for scouts
+                # cyan for scouts
+                color = (0, 255, 255)
             elif isinstance(agent, WorkerAnt):
-                color = (255, 165, 0)  # Orange for workers
+                # orange for workers
+                color = (255, 165, 0)
             elif isinstance(agent, AttackAnt):
-                color = (255, 0, 0)  # Red for AttackAnt
+                # red for attack ant
+                color = (255, 0, 0)
             else:
-                color = (255, 255, 255)  # White for other/unexpected ants
+                color = (255, 255, 255)
+            # draw ants as circles
             pygame.draw.circle(screen, color,
                                (agent.x * cell_size + cell_size // 2, agent.y * cell_size + cell_size // 2),
                                cell_size // 3)
 
+        # set font and get colony counts
         font = pygame.font.Font(None, 36)
         colony_counts = self.count_ants()
 
-        # Display Colony 1 Information
+        # display colony 1 info
         header_1 = font.render("Colony Blue", True, (255, 255, 255))
         screen.blit(header_1, (10, 10))
         colony_1_text = [
@@ -250,7 +265,7 @@ class Simulation:
             text = font.render(line, True, (255, 255, 255))
             screen.blit(text, (10, 50 + i * 30))
 
-        # Display Colony 2 Information
+        # display colony 2 info
         header_2 = font.render("Colony Red", True, (255, 255, 255))
         screen.blit(header_2, (screen.get_width() - 300, 10))
         colony_2_text = [
@@ -263,11 +278,12 @@ class Simulation:
             text = font.render(line, True, (255, 255, 255))
             screen.blit(text, (screen.get_width() - 300, 50 + i * 30))
 
+        # display winning colony
         if hasattr(self, 'winning_colony'):
-            another_font = pygame.font.Font(None, 125)  # Bigger font size
+            another_font = pygame.font.Font(None, 125)
             winning_text = another_font.render(f"Colony {self.winning_colony} Wins!", True, (255, 255, 255))  # White text
             screen.blit(winning_text,
                         (screen.get_width() // 2 - winning_text.get_width() // 2,
-                         screen.get_height() // 2 - winning_text.get_height() // 2))  # Center the text
+                         screen.get_height() // 2 - winning_text.get_height() // 2))
 
         pygame.display.flip()
