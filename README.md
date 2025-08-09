@@ -1,13 +1,13 @@
 Multi-Agent System for Colony Simulation 
 
-1.Overall Goal of the MAS  
+Overall Goal of the MAS  
 The main goal of this MAS system is to simulate a gamified dynamic competition 
 between two ant colonies. The agents within each colony must work collaboratively, 
 achieving the goals of each role (Scout, Worker, and Attacker) to efficiently gather food 
 from the environment and defend their colony. The game ends once one colony 
 manages to eliminate all the ants from the opposing colony. 
 
-2. Features of the MAS 
+Features of the MAS 
 Role-based Agents  
 • Scout Ants: Scans the environment, finds food and creates paths from the food 
 back to the nest using pheromones. 
@@ -44,7 +44,7 @@ Victory Condition
 • A colony wins once it eliminates all ants from opposing colony, the winning 
 colony displays on screen. 
 
-4. Agent-Oriented Design 
+Agent-Oriented Design 
 Agent Types and Roles: 
 The Scout Ant has a vital role in the colony, it efficiently locates food sources leaving 
 pheromone trails leading back to the nest for worker ants to follow. Scouts have three 
@@ -105,7 +105,7 @@ Pheromone trails are managed by the environment enabling pathfinding, they are
 removed by either the food collected function or specific amount of time. This stops the 
 grid becoming full of pheromone trails as they are visible. 
 
-6. Proposed Enhancements 
+Proposed Enhancements 
 Further Gamification 
 As the MAS has prioritised gamification over realism, further user interaction would 
 enhance engagement and enjoyment. An example could be implementing the ability to 
@@ -124,7 +124,7 @@ done by adding textures for each of the visual components and adding animations 
 ant movement and combat. These improvements would make the simulation more 
 visually engaging.
 
-8. Challenges and Achievements 
+Challenges and Achievements 
 Challenges 
 Implementing the worker ant logic allowing them to reliably follow pheromone trails to 
 the food source presented a significant challenge. As they would reverse direction or get 
